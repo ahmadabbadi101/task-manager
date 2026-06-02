@@ -1,0 +1,7 @@
+[build]
+builder = "nixpacks"
+buildCommand = "./mvnw -B -DskipTests clean package"
+
+[deploy]
+startCommand = "java -jar target/task-manager-0.0.1-SNAPSHOT.jar"
+healthcheckPath = "/tasks"
