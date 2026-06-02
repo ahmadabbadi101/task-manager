@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Task Manager</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: #f4f5f7;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #1a1a2e;
+      color: #fff;
+      padding: 0 2rem;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; letter-spacing: 0.03em; }
+
+    /* ── Main content ── */
+    main { max-width: 1100px; margin: 2rem auto; padding: 0 1.5rem; }
+
+    /* ── Create form card ── */
+    .card {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 1.75rem;
+      overflow: hidden;
+    }
+    .card-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.85rem 1.5rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .card-toggle:hover { background: #fafafa; }
+    .card-toggle h2 { font-size: 0.85rem; font-weight: 600; text-transform: uppercase;
+                      letter-spacing: 0.06em; color: #6b7280; }
+    .card-toggle .chevron { font-size: 0.75rem; color: #9ca3af; transition: transform 0.2s; }
+    .card-toggle.open .chevron { transform: rotate(180deg); }
+    .card-body {
+      display: none;
+      padding: 0 1.5rem 1.25rem;
+      border-top: 1px solid #f3f4f6;
+    }
+    .card-body.open { display: block; padding-top: 1.1rem; }
+
+    .form-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .form-row .field { display: flex; flex-direction: column; gap: 0.3rem; }
+    .form-row .field.grow { flex: unset; }
+    .form-row label { font-size: 0.75rem; font-weight: 500; color: #6b7280; }
+    .form-row input, .form-row select {
+      padding: 0.5rem 0.65rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      background: #fff;
+      color: #1a1a2e;
+      outline: none;
+      transition: border-color 0.15s;
+    }
+    .form-row input:focus, .form-row select:focus { border-color: #6366f1; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.825rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: opacity 0.15s, filter 0.15s;
+      white-space: nowrap;
+    }
+    .btn:hover { filter: brightness(0.92); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary   { background: #6366f1; color: #fff; }
+    .btn-edit      { background: #e0e7ff; color: #4338ca; }
+    .btn-save      { background: #d1fae5; color: #065f46; }
+    .btn-breakdown { background: #fef3c7; color: #92400e; }
+    .btn-delete    { background: #fee2e2; color: #991b1b; }
+
+    /* ── Table ── */
+    .table-card { background: #fff; border-radius: 10px;
+                  box-shadow: 0 1px 4px rgba(0,0,0,0.08); overflow: hidden; }
+    .table-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 1rem 1.5rem 0.75rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .table-header h2 { font-size: 0.85rem; font-weight: 600;
+                       text-transform: uppercase; letter-spacing: 0.06em; color: #6b7280; }
+    #task-count { font-size: 0.8rem; color: #9ca3af; }
+
+    table { width: 100%; border-collapse: collapse; }
+    thead th {
+      text-align: left;
+      padding: 0.65rem 1.25rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #9ca3af;
+      background: #fafafa;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    tbody tr.task-row {
+      cursor: pointer;
+      transition: background 0.12s;
+      border-bottom: 1px solid #f3f4f6;
+    }
+    tbody tr.task-row:hover { background: #e5e7eb; cursor: pointer; }
+    tbody tr.task-row.expanded { background: #eef2ff; }
+    tbody td { padding: 0.75rem 1.25rem; font-size: 0.875rem; vertical-align: middle; }
+
+    /* ── Expanded detail row ── */
+    tr.detail-row td { padding: 0; border-bottom: 1px solid #e5e7eb; }
+    .detail-panel {
+      padding: 1.25rem 1.5rem;
+      background: #f5f7ff;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+
+    .detail-fields {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 0.75rem 1.25rem;
+    }
+    .detail-field label {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #9ca3af;
+      margin-bottom: 0.25rem;
+    }
+    .detail-field .view-value {
+      font-size: 0.9rem;
+      color: #1a1a2e;
+      padding: 0.15rem 0;
+    }
+    .detail-field input, .detail-field select {
+      width: 100%;
+      padding: 0.45rem 0.6rem;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      background: #fff;
+      color: #1a1a2e;
+      outline: none;
+    }
+    .detail-field input:focus, .detail-field select:focus { border-color: #6366f1; }
+    .detail-field.full-width { grid-column: 1 / -1; }
+
+    .detail-actions { display: flex; align-items: center; justify-content: space-between; }
+
+    /* ── Breakdown result ── */
+    .breakdown-result {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+    .breakdown-result h4 {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #6b7280;
+      margin-bottom: 0.75rem;
+    }
+    .breakdown-result ol {
+      padding-left: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.4rem;
+    }
+    .breakdown-result li { font-size: 0.875rem; color: #374151; }
+    .breakdown-loading { font-size: 0.85rem; color: #9ca3af; font-style: italic; }
+
+    /* ── Badges ── */
+    .badge {
+      display: inline-block;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.03em;
+    }
+    .badge-HIGH        { background: #fee2e2; color: #991b1b; }
+    .badge-MEDIUM      { background: #ffedd5; color: #92400e; }
+    .badge-LOW         { background: #d1fae5; color: #065f46; }
+    .badge-TODO        { background: #f3f4f6; color: #6b7280; }
+    .badge-IN_PROGRESS { background: #dbeafe; color: #1d4ed8; }
+    .badge-DONE        { background: #d1fae5; color: #065f46; }
+
+    /* ── Empty state ── */
+    .empty-state {
+      text-align: center;
+      padding: 3rem 1rem;
+      color: #9ca3af;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>Task Manager</h1>
+</header>
+
+<main>
+
+  <!-- Create form -->
+  <div class="card">
+    <div class="card-toggle" id="form-toggle">
+      <h2>+ New Task</h2>
+      <span class="chevron">▼</span>
+    </div>
+    <div class="card-body" id="form-body">
+    <div class="form-row">
+      <div class="field grow">
+        <label for="f-title">Title *</label>
+        <input id="f-title" type="text" placeholder="Task title" />
+      </div>
+      <div class="field grow">
+        <label for="f-desc">Description</label>
+        <input id="f-desc" type="text" placeholder="Optional description" />
+      </div>
+      <div class="field">
+        <label for="f-due">Due Date</label>
+        <input id="f-due" type="date" />
+      </div>
+      <div class="field">
+        <label for="f-priority">Priority *</label>
+        <select id="f-priority">
+          <option value="">-- select --</option>
+          <option value="LOW">Low</option>
+          <option value="MEDIUM">Medium</option>
+          <option value="HIGH">High</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-status">Status *</label>
+        <select id="f-status">
+          <option value="">-- select --</option>
+          <option value="TODO">To Do</option>
+          <option value="IN_PROGRESS">In Progress</option>
+          <option value="DONE">Done</option>
+        </select>
+      </div>
+      <div class="field">
+        <button class="btn btn-primary" id="btn-add" style="align-self:flex-start">+ Add Task</button>
+      </div>
+    </div>
+    </div>
+  </div>
+
+  <!-- Task table -->
+  <div class="table-card">
+    <div class="table-header">
+      <h2>Tasks</h2>
+      <span id="task-count"></span>
+    </div>
+    <table>
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Title</th>
+          <th>Priority</th>
+          <th>Status</th>
+          <th>Due Date</th>
+        </tr>
+      </thead>
+      <tbody id="task-tbody"></tbody>
+    </table>
+  </div>
+
+</main>
+
+<script>
+  const API = 'http://localhost:8081/tasks';
+  let expandedId = null;
+
+  // ── Fetch helpers ────────────────────────────────────────────────────────
+  async function apiFetch(path, options = {}) {
+    const res = await fetch(API + path, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    if (res.status === 204) return null;
+    const text = await res.text();
+    if (!res.ok) {
+      const err = text ? JSON.parse(text) : {};
+      throw new Error(err.message || `HTTP ${res.status}`);
+    }
+    return text ? JSON.parse(text) : null;
+  }
+
+  // ── Formatting helpers ───────────────────────────────────────────────────
+  function badge(value, type) {
+    return `<span class="badge badge-${value}">${formatLabel(value, type)}</span>`;
+  }
+  function formatLabel(value, type) {
+    if (type === 'status') return { TODO: 'To Do', IN_PROGRESS: 'In Progress', DONE: 'Done' }[value] ?? value;
+    if (type === 'priority') return { LOW: 'Low', MEDIUM: 'Medium', HIGH: 'High' }[value] ?? value;
+    return value;
+  }
+  function formatDate(d) { return d ? d : '—'; }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  async function loadTasks() {
+    const tasks = await apiFetch('');
+    renderTable(tasks);
+  }
+
+  function renderTable(tasks) {
+    const tbody = document.getElementById('task-tbody');
+    const count = document.getElementById('task-count');
+    count.textContent = `${tasks.length} task${tasks.length !== 1 ? 's' : ''}`;
+
+    if (tasks.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state">No tasks yet. Create one above.</div></td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = '';
+    tasks.forEach(task => {
+      const isExpanded = task.id === expandedId;
+
+      // Main row
+      const tr = document.createElement('tr');
+      tr.className = 'task-row' + (isExpanded ? ' expanded' : '');
+      tr.dataset.id = task.id;
+      tr.innerHTML = `
+        <td>${task.id}</td>
+        <td>${task.title}</td>
+        <td>${badge(task.priority, 'priority')}</td>
+        <td>${badge(task.status, 'status')}</td>
+        <td>${formatDate(task.dueDate)}</td>
+      `;
+      tr.addEventListener('click', () => toggleDetail(task.id));
+      tbody.appendChild(tr);
+
+      // Detail row
+      if (isExpanded) {
+        const detailTr = document.createElement('tr');
+        detailTr.className = 'detail-row';
+        detailTr.dataset.detailFor = task.id;
+        detailTr.innerHTML = `<td colspan="5">${buildDetailPanel(task)}</td>`;
+        tbody.appendChild(detailTr);
+        attachDetailListeners(detailTr, task);
+      }
+    });
+  }
+
+  function buildDetailPanel(task) {
+    return `
+      <div class="detail-panel" id="panel-${task.id}">
+        <div class="detail-fields">
+          <div class="detail-field full-width">
+            <label>Title</label>
+            <div class="view-value" data-field="title">${task.title}</div>
+            <input class="edit-input" data-field="title" type="text" value="${task.title}" style="display:none" />
+          </div>
+          <div class="detail-field full-width">
+            <label>Description</label>
+            <div class="view-value" data-field="description">${task.description ?? '—'}</div>
+            <input class="edit-input" data-field="description" type="text" value="${task.description ?? ''}" style="display:none" />
+          </div>
+          <div class="detail-field">
+            <label>Due Date</label>
+            <div class="view-value" data-field="dueDate">${formatDate(task.dueDate)}</div>
+            <input class="edit-input" data-field="dueDate" type="date" value="${task.dueDate ?? ''}" style="display:none" />
+          </div>
+          <div class="detail-field">
+            <label>Priority</label>
+            <div class="view-value" data-field="priority">${badge(task.priority, 'priority')}</div>
+            <select class="edit-input" data-field="priority" style="display:none">
+              <option value="LOW"    ${task.priority==='LOW'    ?'selected':''}>Low</option>
+              <option value="MEDIUM" ${task.priority==='MEDIUM' ?'selected':''}>Medium</option>
+              <option value="HIGH"   ${task.priority==='HIGH'   ?'selected':''}>High</option>
+            </select>
+          </div>
+          <div class="detail-field">
+            <label>Status</label>
+            <div class="view-value" data-field="status">${badge(task.status, 'status')}</div>
+            <select class="edit-input" data-field="status" style="display:none">
+              <option value="TODO"        ${task.status==='TODO'        ?'selected':''}>To Do</option>
+              <option value="IN_PROGRESS" ${task.status==='IN_PROGRESS' ?'selected':''}>In Progress</option>
+              <option value="DONE"        ${task.status==='DONE'        ?'selected':''}>Done</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="detail-actions">
+          <button class="btn btn-edit"      id="btn-edit-${task.id}">Edit</button>
+          <button class="btn btn-breakdown" id="btn-breakdown-${task.id}">Breakdown</button>
+          <button class="btn btn-delete"    id="btn-delete-${task.id}">Delete</button>
+        </div>
+
+        <div id="breakdown-result-${task.id}" style="display:none"></div>
+      </div>
+    `;
+  }
+
+  function attachDetailListeners(detailTr, task) {
+    const panel = detailTr.querySelector(`#panel-${task.id}`);
+    const editBtn = panel.querySelector(`#btn-edit-${task.id}`);
+    let editing = false;
+
+    // Edit / Save toggle
+    editBtn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!editing) {
+        enterEditMode(panel, editBtn);
+        editing = true;
+      } else {
+        await saveTask(panel, task, editBtn);
+        editing = false;
+      }
+    });
+
+    // Breakdown
+    panel.querySelector(`#btn-breakdown-${task.id}`).addEventListener('click', async (e) => {
+      e.stopPropagation();
+      await runBreakdown(task.id);
+    });
+
+    // Delete
+    panel.querySelector(`#btn-delete-${task.id}`).addEventListener('click', async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Delete "${task.title}"?`)) return;
+      await apiFetch(`/${task.id}`, { method: 'DELETE' });
+      expandedId = null;
+      loadTasks();
+    });
+  }
+
+  function enterEditMode(panel, editBtn) {
+    panel.querySelectorAll('.view-value').forEach(el => el.style.display = 'none');
+    panel.querySelectorAll('.edit-input').forEach(el => el.style.display = '');
+    editBtn.textContent = 'Save';
+    editBtn.className = 'btn btn-save';
+  }
+
+  function exitEditMode(panel, editBtn) {
+    panel.querySelectorAll('.view-value').forEach(el => el.style.display = '');
+    panel.querySelectorAll('.edit-input').forEach(el => el.style.display = 'none');
+    editBtn.textContent = 'Edit';
+    editBtn.className = 'btn btn-edit';
+  }
+
+  async function saveTask(panel, task, editBtn) {
+    const getValue = (field) => panel.querySelector(`.edit-input[data-field="${field}"]`).value;
+    const body = {
+      title:       getValue('title'),
+      description: getValue('description') || null,
+      dueDate:     getValue('dueDate')     || null,
+      priority:    getValue('priority'),
+      status:      getValue('status'),
+    };
+    await apiFetch(`/${task.id}`, { method: 'PUT', body: JSON.stringify(body) });
+    expandedId = task.id;
+    loadTasks();
+  }
+
+  async function runBreakdown(taskId) {
+    const resultDiv = document.getElementById(`breakdown-result-${taskId}`);
+    const btn = document.getElementById(`btn-breakdown-${taskId}`);
+    resultDiv.style.display = 'block';
+    resultDiv.innerHTML = `<div class="breakdown-result"><p class="breakdown-loading">Generating subtasks…</p></div>`;
+    btn.disabled = true;
+
+    try {
+      const data = await apiFetch(`/${taskId}/breakdown`, { method: 'POST' });
+      const items = data.subtasks.map(s => `<li>${s}</li>`).join('');
+      resultDiv.innerHTML = `
+        <div class="breakdown-result">
+          <h4>AI Breakdown — ${data.title}</h4>
+          <ol>${items}</ol>
+        </div>`;
+    } catch (err) {
+      resultDiv.innerHTML = `<div class="breakdown-result"><p style="color:#991b1b">${err.message}</p></div>`;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // ── Toggle expanded row ──────────────────────────────────────────────────
+  function toggleDetail(taskId) {
+    expandedId = expandedId === taskId ? null : taskId;
+    loadTasks();
+  }
+
+  // ── Create task ──────────────────────────────────────────────────────────
+  document.getElementById('btn-add').addEventListener('click', async () => {
+    const title    = document.getElementById('f-title').value.trim();
+    const desc     = document.getElementById('f-desc').value.trim();
+    const dueDate  = document.getElementById('f-due').value;
+    const priority = document.getElementById('f-priority').value;
+    const status   = document.getElementById('f-status').value;
+
+    if (!title || !priority || !status) {
+      alert('Title, Priority, and Status are required.');
+      return;
+    }
+
+    await apiFetch('', {
+      method: 'POST',
+      body: JSON.stringify({ title, description: desc || null, dueDate: dueDate || null, priority, status }),
+    });
+
+    document.getElementById('f-title').value    = '';
+    document.getElementById('f-desc').value     = '';
+    document.getElementById('f-due').value      = '';
+    document.getElementById('f-priority').value = '';
+    document.getElementById('f-status').value   = '';
+    document.getElementById('form-toggle').classList.remove('open');
+    document.getElementById('form-body').classList.remove('open');
+    loadTasks();
+  });
+
+  // ── Form toggle ──────────────────────────────────────────────────────────
+  document.getElementById('form-toggle').addEventListener('click', () => {
+    const toggle = document.getElementById('form-toggle');
+    const body   = document.getElementById('form-body');
+    toggle.classList.toggle('open');
+    body.classList.toggle('open');
+  });
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  loadTasks();
+</script>
+
+</body>
+</html>
