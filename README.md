@@ -1,35 +1,44 @@
 # Task Manager API
 
-A personal task manager REST API built with Java 17, Spring Boot, Maven, and H2. Includes a single-page frontend and an AI-powered task breakdown endpoint.
+A personal task manager REST API built with Java 17, Spring Boot, Maven, and PostgreSQL. Includes a single-page frontend and an AI-powered task breakdown endpoint. Deployed on Railway.
+
+**Live demo:** https://web-production-7552b0.up.railway.app/
 
 ## Prerequisites
 
 - Java 17+
+- PostgreSQL database
 - Internet access (for the AI breakdown endpoint)
 
-## Run
+## Run locally
 
-Set the three required environment variables and start the app.
+You need a running PostgreSQL instance and the following environment variables set before starting.
 
 **Windows (PowerShell):**
 ```powershell
+$env:DATABASE_URL="jdbc:postgresql://localhost:5432/taskdb"
 $env:AI_API_KEY="your_key_here"
-$env:AI_API_URL="your_api_url"
-$env:AI_MODEL="your-model-name"
+$env:AI_API_URL="https://api.groq.com/openai/v1/chat/completions"
+$env:AI_MODEL="llama-3.3-70b-versatile"
 .\mvnw.cmd spring-boot:run
 ```
 
 **Mac/Linux:**
 ```bash
+DATABASE_URL=jdbc:postgresql://localhost:5432/taskdb \
 AI_API_KEY=your_key_here \
-AI_API_URL=your_api_url \
-AI_MODEL=your-model-name \
+AI_API_URL=https://api.groq.com/openai/v1/chat/completions \
+AI_MODEL=llama-3.3-70b-versatile \
 ./mvnw spring-boot:run
 ```
 
-The values above use Groq with Llama. Swap `AI_API_URL` and `AI_MODEL` for any other OpenAI-compatible provider: Together AI, OpenRouter, Mistral, and others all work. **Gemini and Claude do not**, as they use a different API format.
+`AI_API_URL` and `AI_MODEL` work with any OpenAI-compatible provider: Groq, Together AI, OpenRouter, Mistral, and others. **Gemini and Claude do not**, as they use a different API format.
 
 The app starts on **http://localhost:8081**.
+
+## Database
+
+Tasks are persisted in PostgreSQL. The schema is managed automatically by Hibernate (`ddl-auto=update`) — no manual migrations needed. In tests, H2 in-memory is used instead so no database setup is required to run the test suite.
 
 ## Tests
 
@@ -87,16 +96,18 @@ No request body required. The `{id}` in the path identifies which task to break 
 
 ## Design Decisions
 
-**Enums for Priority and Status.** The valid values are fixed at compile time. Using enums means invalid values (`"URGENT"`, `"low"`) are rejected at the Java type level before reaching service logic. JPA stores them as readable strings via `@Enumerated(EnumType.STRING)`, and Jackson serializes them by name with no extra configuration. They were neither a constants class nor plain string fields on `Task` because both still leave the entity holding a string, meaning any value can get through and the constants are trivially bypassed.
+**Enums for Priority and Status.** The valid values are fixed at compile time. Using enums means invalid values (`"URGENT"`, `"low"`) are rejected at the Java type level before reaching service logic. JPA stores them as readable strings via `@Enumerated(EnumType.STRING)`, and Jackson serializes them by name with no extra configuration.
 
-**Plain HTML + JS over Thymeleaf.** The assessment requires both a working REST API and a UI. Thymeleaf couples the two: controllers return HTML instead of JSON, so `GET /tasks` would give a reviewer an HTML page rather than a JSON array, breaking the API. With plain HTML and `fetch`, the API stays clean JSON and the frontend sits on top of it independently. Both work on their own terms.
+**Plain HTML + JS over Thymeleaf.** Thymeleaf couples the UI to the controllers — `GET /tasks` would return HTML instead of JSON, breaking the REST API. With plain HTML and `fetch`, the API stays clean JSON and the frontend sits on top of it independently.
 
 **Lombok.** `@Data` eliminates boilerplate getters and setters. `@NoArgsConstructor` satisfies JPA's requirement for a zero-arg constructor. `@AllArgsConstructor` pairs with `@Builder` for clean object construction in service code and tests. `@RequiredArgsConstructor` handles constructor injection on `final` fields without writing constructors by hand.
 
 **No DTO for CRUD.** The `Task` entity is flat and maps directly to what the API sends and receives. A separate request/response class would add a mapping layer with no meaningful benefit at this scale. The `BreakdownResponse` is a DTO because it is a derived, AI-generated shape that does not correspond to the entity.
 
-**EntityNotFoundException over a task-specific exception.** The exception takes an entity name and id, making it reusable if other entities are added. The message reads `"Task not found with id: 5"`, same behavior with broader reuse. A `@RestControllerAdvice` global handler maps it to a `404` response, so no controller carries exception-handling logic.
+**EntityNotFoundException over a task-specific exception.** The exception takes an entity name and id, making it reusable if other entities are added. A `@RestControllerAdvice` global handler maps it to a `404` response, so no controller carries exception-handling logic.
 
-**AiService decomposed into four methods.** `buildPrompt`, `callApi`, and `parseSubtasks` each have one responsibility. The `breakdown` method orchestrates them and assembles the final DTO. This makes each piece independently readable and testable rather than one opaque function.
+**AiService decomposed into four methods.** `buildPrompt`, `callApi`, and `parseSubtasks` each have one responsibility. The `breakdown` method orchestrates them and assembles the final DTO.
 
 **Provider-neutral AI integration.** The API key, URL, and model are all environment variables so nothing provider-specific is committed to source. Switching providers requires only changing the values passed at startup, with no code changes.
+
+**PostgreSQL for persistence.** Tasks survive server restarts and redeployments. H2 is kept as a test-scoped dependency so the test suite runs without a database setup.
