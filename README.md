@@ -2,7 +2,7 @@
 
 A personal task manager REST API built with Java 17, Spring Boot, Maven, and PostgreSQL. Includes a single-page frontend and an AI-powered task breakdown endpoint. Deployed on Railway.
 
-**Live demo:** https://web-production-7552b0.up.railway.app/
+**Live demo:** https://subtask.up.railway.app/
 
 ## Prerequisites
 
